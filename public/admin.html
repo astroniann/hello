@@ -1,0 +1,90 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin · Add Turf Data</title>
+  <style>
+    *{box-sizing:border-box;}
+    body{font-family:Arial,Helvetica,sans-serif;margin:20px;background:#fafafa;}
+    h1{text-align:center;margin-bottom:16px;}
+    form{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:24px;}
+    input,button{padding:8px 12px;font-size:14px;border:1px solid #ccc;border-radius:6px;}
+    button{cursor:pointer;background:#0077ff;color:#fff;}
+    button:hover{background:#005fca;}
+    .notice{text-align:center;color:#d00;margin-bottom:12px;}
+    .link{text-align:center;margin-top:8px;}
+  </style>
+</head>
+<body>
+  <h1>Add Turf Data (Admin)</h1>
+
+  <div id="limitNotice" class="notice" hidden>⚠️ Maximum of 10 turfs reached.</div>
+
+  <form id="turfForm">
+    <input type="text" name="owner" placeholder="Owner Name" required>
+    <input type="text" name="turfName" placeholder="Turf Name" required>
+    <input type="number" name="bookings" placeholder="Bookings" min="0" required>
+    <input type="number" name="reviews" placeholder="Reviews" min="0" required>
+    <input type="number" name="thumbsUp" placeholder="Thumbs Up" min="0" required>
+    <input type="number" name="thumbsDown" placeholder="Thumbs Down" min="0" required>
+    <input type="number" name="imageCount" placeholder="Images Uploaded" min="0" required>
+    <input type="text" name="sports" placeholder="Sports (comma-separated)" required>
+    <input type="number" name="turfsMetric" placeholder="Turf Metric" min="0" required>
+    <input type="number" name="profilesAttending" placeholder="Profiles Attending" min="0" required>
+    <button type="submit">Save Turf</button>
+  </form>
+
+  <div class="link"><a href="search.html">→ Go to User Search Page</a></div>
+
+<script>
+const MAX_TURFS = 10;
+const form = document.getElementById('turfForm');
+const limitNotice = document.getElementById('limitNotice');
+
+function updateNotice(count){
+  const tooMany = count >= MAX_TURFS;
+  limitNotice.hidden = !tooMany;
+  form.querySelector('button[type="submit"]').disabled = tooMany;
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const data = Object.fromEntries(new FormData(form).entries());
+  const turf = {
+    owner: data.owner.trim(),
+    turfName: data.turfName.trim(),
+    bookings: +data.bookings,
+    reviews: +data.reviews,
+    thumbsUp: +data.thumbsUp,
+    thumbsDown: +data.thumbsDown,
+    imageCount: +data.imageCount,
+    sports: data.sports.split(',').map(s=>s.trim()).filter(Boolean),
+    turfsMetric: +data.turfsMetric,
+    profilesAttending: +data.profilesAttending,
+    keywordMatches: 1
+  };
+
+  try {
+    const res = await fetch('/api/turfs', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(turf)
+    });
+    const json = await res.json();
+    if(!res.ok) throw json;
+    alert(`Turf saved! (${json.count}/${MAX_TURFS})`);
+    form.reset();
+    updateNotice(json.count);
+  } catch(err){
+    if(err.error === 'MAX_TURFS') updateNotice(MAX_TURFS);
+    else alert('Save failed.');
+  }
+});
+
+fetch('/api/turfs').then(r=>r.json()).then(list=>updateNotice(list.length));
+</script>
+
+</body>
+</html>

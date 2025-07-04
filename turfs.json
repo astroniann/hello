@@ -1,0 +1,40 @@
+[
+  {
+    "owner": "Alice",
+    "turfName": "Green FIelds",
+    "bookings": 30,
+    "reviews": 20,
+    "thumbsUp": 5,
+    "thumbsDown": 2,
+    "imageCount": 10,
+    "sports": [
+      "badminton",
+      "cricket",
+      "football",
+      "tennis",
+      "basketball"
+    ],
+    "turfsMetric": 4,
+    "profilesAttending": 30,
+    "keywordMatches": 1
+  },
+  {
+    "owner": "OM",
+    "turfName": "Green FIelds",
+    "bookings": 20,
+    "reviews": 25,
+    "thumbsUp": 5,
+    "thumbsDown": 40,
+    "imageCount": 6,
+    "sports": [
+      "badminton",
+      "cricket",
+      "football",
+      "tennis",
+      "basketball"
+    ],
+    "turfsMetric": 80,
+    "profilesAttending": 30,
+    "keywordMatches": 1
+  }
+]

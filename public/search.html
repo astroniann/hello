@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Search Turfs by Sport</title>
+  <style>
+    *{box-sizing:border-box;}
+    body{font-family:Arial,Helvetica,sans-serif;margin:20px;background:#fff;}
+    h1{text-align:center;margin-bottom:16px;}
+    .controls{display:flex;gap:10px;justify-content:center;margin-bottom:20px;}
+    input,button{padding:8px 12px;font-size:14px;border:1px solid #ccc;border-radius:6px;}
+    button{cursor:pointer;}
+    ul#turfList{list-style:none;padding:0;max-width:600px;margin:0 auto;}
+    ul#turfList li{
+      padding:10px;border:1px solid #ddd;border-radius:5px;margin-bottom:10px;
+      text-align:center;background:#f9f9f9;transition:background .3s;
+      display:flex;justify-content:space-between;align-items:center;
+    }
+    ul#turfList li.match{background:#e7fbe9;}
+    .score{font-size:0.9em;color:#666;}
+    .no-data{text-align:center;color:#777;margin-top:24px;}
+    .link{text-align:center;margin-top:12px;}
+  </style>
+</head>
+<body>
+  <h1>Find Turfs by Sport</h1>
+
+  <div class="controls">
+    <input type="text" id="sportSearch" placeholder="Search Sport (e.g., Badminton)">
+    <button id="searchBtn">Search</button>
+    <button id="resetBtn">Show&nbsp;All</button>
+  </div>
+
+  <ul id="turfList"></ul>
+  <div id="noData" class="no-data" hidden>No turf data available. Ask the admin to add turfs first.</div>
+  <div class="link"><a href="admin.html">← Back to Admin Page</a></div>
+
+<script>
+/* ---------- WEIGHTS ---------- */
+const weights = {
+  bookings:          0.2667,
+  reviews:           0.1333,
+  reviewWeighting:   0.20,
+  imageCount:        0.0667,
+  keywordMatches:    0.1333,
+  turfsMetric:       0.1333,
+  profilesAttending: 0.0667
+};
+
+/* ---------- DATA FETCH ---------- */
+async function loadTurfs() {
+  const res = await fetch('/api/turfs');
+  if (!res.ok) throw new Error('API error');
+  return res.json();
+}
+
+/* ---------- SCORING HELPERS ---------- */
+function computeMax(list) {
+  return {
+    bookings:          Math.max(...list.map(t => t.bookings),              1),
+    reviews:           Math.max(...list.map(t => t.reviews),               1),
+    reviewWeighting:   Math.max(...list.map(t => t.thumbsUp - t.thumbsDown), 1),
+    imageCount:        Math.max(...list.map(t => t.imageCount),            1),
+    keywordMatches:    Math.max(...list.map(t => t.keywordMatches),        1),
+    turfsMetric:       Math.max(...list.map(t => t.turfsMetric),           1),
+    profilesAttending: Math.max(...list.map(t => t.profilesAttending),     1)
+  };
+}
+
+function calcScore(t, max) {
+  const norm = {
+    B : t.bookings           / max.bookings,
+    R : t.reviews            / max.reviews,
+    RW: (t.thumbsUp - t.thumbsDown) / max.reviewWeighting,
+    I : t.imageCount         / max.imageCount,
+    K : t.keywordMatches     / max.keywordMatches,
+    T : t.turfsMetric        / max.turfsMetric,
+    P : t.profilesAttending  / max.profilesAttending
+  };
+  return (
+    norm.B  * weights.bookings          +
+    norm.R  * weights.reviews           +
+    norm.RW * weights.reviewWeighting   +
+    norm.I  * weights.imageCount        +
+    norm.K  * weights.keywordMatches    +
+    norm.T  * weights.turfsMetric       +
+    norm.P  * weights.profilesAttending
+  );
+}
+
+/* ---------- RENDER ---------- */
+function displayTurfList(list, kw) {
+  const ul     = document.getElementById('turfList');
+  const noData = document.getElementById('noData');
+
+  if (!list.length) {
+    ul.innerHTML   = '';
+    noData.hidden  = false;
+    return;
+  }
+
+  noData.hidden = true;
+  ul.innerHTML  = '';
+
+  list.forEach((turf, idx) => {
+    const li         = document.createElement('li');
+    li.className     = (kw && turf.keywordMatches) ? 'match' : '';
+    li.innerHTML     = `<strong>${idx + 1}. ${turf.turfName}</strong>
+                        <span class="score">${turf.__score.toFixed(3)}</span>`;
+    ul.appendChild(li);
+  });
+}
+
+/* ---------- SHOW‑ALL ---------- */
+async function globalList() {
+  const turfs = await loadTurfs();
+  if (!turfs.length) { displayTurfList([], null); return; }
+
+  /* treat every turf as one keyword match so scoring still works */
+  turfs.forEach(t => t.keywordMatches = 1);
+
+  const max = computeMax(turfs);
+  turfs.forEach(t => (t.__score = calcScore(t, max)));
+  turfs.sort((a, b) => b.__score - a.__score);    // highest first
+
+  displayTurfList(turfs, null);
+}
+
+/* ---------- SEARCH ---------- */
+async function searchSport() {
+  const kw     = document.getElementById('sportSearch').value.trim().toLowerCase();
+  const turfs  = await loadTurfs();
+
+  if (!kw) { globalList(); return; }
+
+  /* count keyword matches per turf */
+  turfs.forEach(t => {
+    t.keywordMatches = t.sports
+      .reduce((acc, s) => acc + (s.toLowerCase().includes(kw) ? 1 : 0), 0);
+  });
+
+  const max = computeMax(turfs);
+  turfs.forEach(t => (t.__score = calcScore(t, max)));
+
+  /* first group: those with ≥1 keyword match; then sort both groups by score */
+  turfs.sort((a, b) => {
+    const aHas = a.keywordMatches > 0, bHas = b.keywordMatches > 0;
+    if (aHas !== bHas) return bHas - aHas;        // true (1) before false (0)
+    return b.__score - a.__score;                 // then by score desc
+  });
+
+  displayTurfList(turfs, kw);
+}
+
+/* ---------- WIRES ---------- */
+document.getElementById('searchBtn').addEventListener('click', searchSport);
+document.getElementById('resetBtn').addEventListener('click', globalList);
+document.addEventListener('DOMContentLoaded', globalList);
+</script>
+</body>
+</html>
